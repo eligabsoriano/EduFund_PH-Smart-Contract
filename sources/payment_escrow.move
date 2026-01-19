@@ -30,42 +30,46 @@ module edufund::payment_escrow {
     public struct EscrowCreated<phantom T> has copy, drop { borrower: address, school: address, amount: u64 }
     public struct FundsReleased<phantom T> has copy, drop { school: address, amount: u64 }
 
-    // ===== Functions =====
-    public fun create<T>(
+    // ===== Entry Functions =====
+    entry fun create_escrow<T>(
         state: &ProtocolState,
         coin: Coin<T>,
         school: address,
         ctx: &mut TxContext
-    ): Escrow<T> {
+    ) {
         edufund::assert_not_paused(state);
         assert!(edufund::is_school_approved(state, school), ESchoolNotApproved);
         let amt = coin.value();
         event::emit(EscrowCreated<T> { borrower: ctx.sender(), school, amount: amt });
-        Escrow {
+        let escrow = Escrow {
             id: object::new(ctx),
             borrower: ctx.sender(),
             school,
             funds: coin.into_balance(),
             released: false,
-        }
+        };
+        transfer::transfer(escrow, ctx.sender());
     }
 
-    public fun release<T>(escrow: &mut Escrow<T>, ctx: &mut TxContext): (Coin<T>, PaymentProof) {
+    entry fun release_to_school<T>(escrow: Escrow<T>, ctx: &mut TxContext) {
         assert!(!escrow.released, EAlreadyReleased);
-        escrow.released = true;
-        let amt = escrow.funds.value();
-        event::emit(FundsReleased<T> { school: escrow.school, amount: amt });
-        let coin = coin::from_balance(escrow.funds.withdraw_all(), ctx);
+        let Escrow { id, borrower, school, funds, released: _ } = escrow;
+        let amt = funds.value();
+        event::emit(FundsReleased<T> { school, amount: amt });
+        let coin = coin::from_balance(funds, ctx);
+        transfer::public_transfer(coin, school);
         let proof = PaymentProof {
             id: object::new(ctx),
-            borrower: escrow.borrower,
-            school: escrow.school,
+            borrower,
+            school,
             amount: amt,
             timestamp: ctx.epoch(),
         };
-        (coin, proof)
+        transfer::public_transfer(proof, borrower);
+        object::delete(id);
     }
 
+    // ===== View Functions =====
     public fun is_released<T>(escrow: &Escrow<T>): bool { escrow.released }
     public fun escrow_amount<T>(escrow: &Escrow<T>): u64 { escrow.funds.value() }
 }

@@ -21,32 +21,35 @@ module edufund::student_vault {
     public struct SavingsDeposited<phantom T> has copy, drop { owner: address, amount: u64 }
     public struct SavingsWithdrawn<phantom T> has copy, drop { owner: address, amount: u64 }
 
-    // ===== Functions =====
-    public fun create<T>(goal: u64, ctx: &mut TxContext): StudentVault<T> {
+    // ===== Entry Functions =====
+    entry fun create_vault<T>(goal: u64, ctx: &mut TxContext) {
         let owner = ctx.sender();
         event::emit(VaultCreated { owner, goal });
-        StudentVault {
+        let vault = StudentVault<T> {
             id: object::new(ctx),
             owner,
             savings: balance::zero(),
             goal,
             total_repaid: 0,
-        }
+        };
+        transfer::transfer(vault, owner);
     }
 
-    public fun deposit<T>(vault: &mut StudentVault<T>, coin: Coin<T>, _ctx: &TxContext) {
+    entry fun deposit<T>(vault: &mut StudentVault<T>, coin: Coin<T>) {
         let amt = coin.value();
         vault.savings.join(coin.into_balance());
         event::emit(SavingsDeposited<T> { owner: vault.owner, amount: amt });
     }
 
-    public fun withdraw<T>(vault: &mut StudentVault<T>, amount: u64, ctx: &mut TxContext): Coin<T> {
+    entry fun withdraw<T>(vault: &mut StudentVault<T>, amount: u64, ctx: &mut TxContext) {
         assert!(vault.savings.value() >= amount, EInsufficientSavings);
         event::emit(SavingsWithdrawn<T> { owner: vault.owner, amount });
-        coin::from_balance(vault.savings.split(amount), ctx)
+        let coin = coin::from_balance(vault.savings.split(amount), ctx);
+        transfer::public_transfer(coin, vault.owner);
     }
 
-    public fun record_repayment<T>(vault: &mut StudentVault<T>, amount: u64) {
+    // ===== Public Functions =====
+    public(package) fun record_repayment<T>(vault: &mut StudentVault<T>, amount: u64) {
         vault.total_repaid = vault.total_repaid + amount;
     }
 

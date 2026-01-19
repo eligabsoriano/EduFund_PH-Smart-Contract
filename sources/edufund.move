@@ -39,25 +39,25 @@ module edufund::edufund {
         init(ctx);
     }
 
-    // ===== Admin Functions =====
-    public fun pause(state: &mut ProtocolState, ctx: &TxContext) {
+    // ===== Admin Entry Functions =====
+    entry fun pause(state: &mut ProtocolState, ctx: &TxContext) {
         assert!(ctx.sender() == state.admin, ENotAdmin);
         state.paused = true;
         event::emit(ProtocolPaused { paused: true });
     }
 
-    public fun unpause(state: &mut ProtocolState, ctx: &TxContext) {
+    entry fun unpause(state: &mut ProtocolState, ctx: &TxContext) {
         assert!(ctx.sender() == state.admin, ENotAdmin);
         state.paused = false;
         event::emit(ProtocolPaused { paused: false });
     }
 
-    public fun set_interest_rate(state: &mut ProtocolState, rate_bps: u64, ctx: &TxContext) {
+    entry fun set_interest_rate(state: &mut ProtocolState, rate_bps: u64, ctx: &TxContext) {
         assert!(ctx.sender() == state.admin, ENotAdmin);
         state.interest_rate_bps = rate_bps;
     }
 
-    public fun add_school(state: &mut ProtocolState, school: address, ctx: &TxContext) {
+    entry fun add_school(state: &mut ProtocolState, school: address, ctx: &TxContext) {
         assert!(ctx.sender() == state.admin, ENotAdmin);
         state.schools.push_back(school);
         event::emit(SchoolAdded { school });
@@ -75,4 +75,3 @@ module edufund::edufund {
         assert!(!state.paused, EPaused);
     }
 }
-
